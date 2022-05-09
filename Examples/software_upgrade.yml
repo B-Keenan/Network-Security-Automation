@@ -1,0 +1,87 @@
+---
+- name: Upgrade BIG-IP Software
+  hosts: bigip
+  gather_facts: False
+  vars:
+    # Find another method to insert the image variable.
+    imageName: "BIGIP-15.1.5.1-0.0.14.iso"
+
+    provider:
+      password: "{{ ansible_ssh_pass }}"
+      server: "{{ ansible_host }}"
+      user: "sd-0482"
+      validate_certs: False
+
+  tasks:
+    - name: Get failover state
+      shell: tmsh show sys failover | awk '{print $2}'
+      register: failover_state
+    
+    - block:
+      - name: Save running configuration
+        bigip_config:
+          save: yes
+          provider: "{{ provider }}"
+        delegate_to: localhost
+      
+      # Comment out this task if no connectivity to callhome or activate.f5.com.
+      - name: Reactivate License
+        shell: SOAPLicenseClient --basekey $(perl -ane 'print $F[3] if /^Registration Key/' /config/bigip.license)
+      
+      # Increase timer to 120 for prod deployments
+      - name: Wait for configuration to finish loading
+        wait_for:
+          timeout: 90
+        delegate_to: localhost
+      
+      # Synchronize changes
+
+      - name: Get current time on BIG-IP
+        command: date "+%F"
+        register: date
+      
+      - name: Download a new UCS
+        bigip_ucs_fetch:
+          src: "{{ inventory_hostname + '-' + date.stdout +  '-backup.ucs' }}"
+          dest: "{{ '/var/tmp/' + inventory_hostname + '-' + date.stdout +  '-backup.ucs' }}"
+          provider: "{{ provider }}"
+        delegate_to: localhost
+      
+      - name: Upload upgrade image
+        bigip_software_image:
+          image: "{{ '/var/tmp/' + imageName }}"
+          provider: "{{ provider }}"
+        delegate_to: localhost
+      
+      - name: Wait for image to become available
+        wait_for:
+          timeout: 30
+        delegate_to: localhost
+      
+      - name: Get available volume number to use
+        script: /home/ben/as3-applications/Ansible/get_vol_number.bash
+        register: vol
+      
+      - name: Install BIG-IP software
+        bigip_software_install:
+          image: "{{ imageName }}"
+          state: activated # 'installed' if you don't want to reboot.
+          volume: "{{ vol.stdout }}"
+          provider: "{{ provider }}"
+        delegate_to: localhost
+
+      - name: Waiting for device to come back up...
+        wait_for:
+          delay: 300
+          port: 443
+          sleep: 30
+          timeout: 1800
+          msg: "Failed to poll device within specified time limit."
+      
+      # Verify device is able to takeover as active.
+
+      when: failover_state.stdout  == 'standby'
+
+# Define new task to failover from active device, then re-play above task.
+# Don't want either task to repeat more than twice.
+...
