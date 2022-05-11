@@ -1,0 +1,33 @@
+---
+- name: Enable Banners
+  hosts: bigips_test
+  gather_facts: False
+  vars:
+    provider:
+      password: "{{ ansible_ssh_pass }}"
+      server: "{{ ansible_host }}"
+      user: "sd-0482"
+      validate_certs: False
+  
+  tasks:
+    - name: Force offline pool members
+      bigip_pool_member:
+        state: forced_offline
+        pool: web_pool
+        partition: SHIT_APPS
+        name: "{{ item.name }}"
+        address: "{{ item.addr }}"
+        port: "{{ item.port }}"
+        provider: "{{ provider }}"
+      delegate_to: localhost
+      loop:
+        - name: web1
+          addr: 10.255.33.182
+          port: 80
+        - name: web2
+          addr: 10.255.33.183
+          port: 80
+        - name: web3
+          addr: 10.255.33.184
+          port: 80
+...

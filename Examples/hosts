@@ -1,0 +1,17 @@
+[bigips_test]
+bigip01.example.com ansible_host=10.255.32.195 ansible_ssh_pass=[3kVN-scZpM4oXQSLh2D
+bigip02.example.com ansible_host=10.255.32.196 ansible_ssh_pass=[3kVN-scZpM4oXQSLh2D
+
+[bigips_test:vars]
+# The upgrade image:
+upgrade_iso="BIGIP-15.1.5.1-0.0.14.iso"
+
+[IBM.1]
+gbbmqlb010cpkfm.warwick ansible_host=198.18.17.112 ansible_ssh_pass="{{vaultpasswd}}"
+[IBM.2]
+gbbmqlb011cpkfm.warwick ansible_host=198.18.17.112 ansible_ssh_pass="{{vaultpasswd}}"
+
+[IBM.1:vars]
+ansible_ssh_common_args='-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ProxyCommand="ssh -W %h:%p -q 10.92.66.66"'
+[IBM.2:vars]
+ansible_ssh_common_args='-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ProxyCommand="ssh -W %h:%p -q 10.92.66.67"'
