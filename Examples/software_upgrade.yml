@@ -1,10 +1,8 @@
 ---
-- name: Upgrade BIG-IP Software
-  hosts: bigip
+- name: TMOS upgrade for an LTM active standby HA pair
+  hosts: bigips_test
   gather_facts: False
   vars:
-    # Find another method to insert the image variable.
-    imageName: "BIGIP-15.1.5.1-0.0.14.iso"
 
     provider:
       password: "{{ ansible_ssh_pass }}"
@@ -13,8 +11,11 @@
       validate_certs: False
 
   tasks:
+
+    # Pre-checks
+
     - name: Get failover state
-      shell: tmsh show sys failover | awk '{print $2}'
+      command: cat /var/prompt/ps1
       register: failover_state
     
     - block:
@@ -25,16 +26,26 @@
         delegate_to: localhost
       
       # Comment out this task if no connectivity to callhome or activate.f5.com.
+      # Create test to verify connectivity and skip of unsuccessful.
       - name: Reactivate License
         shell: SOAPLicenseClient --basekey $(perl -ane 'print $F[3] if /^Registration Key/' /config/bigip.license)
       
-      # Increase timer to 120 for prod deployments
       - name: Wait for configuration to finish loading
         wait_for:
-          timeout: 90
+          timeout: 120
         delegate_to: localhost
       
-      # Synchronize changes
+      - name: Register device-groups with pending changes
+        shell: tmsh show cm sync-status | grep 'to group' | awk '{print $8}'
+        register: device_group
+
+      - name: Synchronize pending changes
+        command: tmsh run cm config-sync to-group "{{ item }}"
+        loop: "{{ device_group.stdout_lines }}"
+        loop_control:
+          pause: 5
+      
+      # Maybe include a wait_for for the final sync.
 
       - name: Get current time on BIG-IP
         command: date "+%F"
@@ -49,7 +60,7 @@
       
       - name: Upload upgrade image
         bigip_software_image:
-          image: "{{ '/var/tmp/' + imageName }}"
+          image: "{{ '/var/tmp/' + upgrade_iso }}"
           provider: "{{ provider }}"
         delegate_to: localhost
       
@@ -64,7 +75,7 @@
       
       - name: Install BIG-IP software
         bigip_software_install:
-          image: "{{ imageName }}"
+          image: "{{ upgrade_iso }}"
           state: activated # 'installed' if you don't want to reboot.
           volume: "{{ vol.stdout }}"
           provider: "{{ provider }}"
@@ -73,15 +84,123 @@
       - name: Waiting for device to come back up...
         wait_for:
           delay: 300
-          port: 443
+          port: 22
           sleep: 30
           timeout: 1800
           msg: "Failed to poll device within specified time limit."
       
-      # Verify device is able to takeover as active.
+      - name: Verify device is in standby
+        bigip_command:
+          provider: "{{ provider }}"
+          warn: no # maybe.. default is yes.
+          commands:
+            - bash -c "cat /var/prompt/ps1"
+          wait_for:
+            - result[0] contains Standby
+          retries: 12
+          interval: 10
+        register: result
+        delegate_to: localhost
 
-      when: failover_state.stdout  == 'standby'
+      when: failover_state.stdout  == 'Standby'
 
-# Define new task to failover from active device, then re-play above task.
-# Don't want either task to repeat more than twice.
+
+    - name: Failover so we're running on the new software
+      command: tmsh run sys failover standby
+      when: failover_state.stdout  == 'Active'
+    
+    - name: Update failover state variable to upgrade next standby
+      command: cat /var/prompt/ps1
+      register: failover_state
+
+    - block:
+      - name: Save running configuration
+        bigip_config:
+          save: yes
+          provider: "{{ provider }}"
+        delegate_to: localhost
+      
+      # Comment out this task if no connectivity to callhome or activate.f5.com.
+      - name: Reactivate License
+        shell: SOAPLicenseClient --basekey $(perl -ane 'print $F[3] if /^Registration Key/' /config/bigip.license)
+      
+      - name: Wait for configuration to finish loading
+        wait_for:
+          timeout: 120
+        delegate_to: localhost
+      
+      - name: Get current time on BIG-IP
+        command: date "+%F"
+        register: date
+      
+      - name: Download a new UCS
+        bigip_ucs_fetch:
+          src: "{{ inventory_hostname + '-' + date.stdout +  '-backup.ucs' }}"
+          dest: "{{ '/var/tmp/' + inventory_hostname + '-' + date.stdout +  '-backup.ucs' }}"
+          provider: "{{ provider }}"
+        delegate_to: localhost
+      
+      - name: Upload upgrade image
+        bigip_software_image:
+          image: "{{ '/var/tmp/' + upgrade_iso }}"
+          provider: "{{ provider }}"
+        delegate_to: localhost
+      
+      - name: Wait for image to become available
+        wait_for:
+          timeout: 30
+        delegate_to: localhost
+      
+      - name: Get available volume number to use
+        script: /path/get_vol_number.bash
+        register: vol
+      
+      - name: Install BIG-IP software
+        bigip_software_install:
+          image: "{{ upgrade_iso }}"
+          state: activated
+          volume: "{{ vol.stdout }}"
+          provider: "{{ provider }}"
+        delegate_to: localhost
+ 
+      - name: Waiting for device to come back up...
+        wait_for:
+          delay: 300
+          port: 22
+          sleep: 30
+          timeout: 1800
+          msg: "Failed to poll device within specified time limit." 
+      
+      - name: Verify device is in standby
+        bigip_command:
+          provider: "{{ provider }}"
+          warn: no # maybe.. default is yes.
+          commands:
+            - bash -c "cat /var/prompt/ps1"
+          wait_for:
+            - result[0] contains Standby
+          retries: 12
+          interval: 10
+        register: result
+        delegate_to: localhost
+      
+      - name: Register device-groups with pending changes
+        shell: tmsh show cm sync-status | grep 'to group' | awk '{print $8}'
+        register: device_group
+
+      - name: Synchronize pending changes
+        command: tmsh run cm config-sync to-group "{{ item }}"
+        loop: "{{ device_group.stdout_lines }}"
+        loop_control:
+          pause: 5
+      
+      when: failover_state.stdout  == 'Standby'
+
+
+    - name: Failover to resume original HA state
+      command: tmsh run sys failover standby
+      when: failover_state.stdout  == 'Active'
+    
+    # Take backups
+    # Post checks
 ...

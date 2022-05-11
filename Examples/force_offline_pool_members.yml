@@ -1,8 +1,6 @@
-# Playbook to demonstrate forcing offline pool members to display banners/Sorry pages.
-
 ---
 - name: Enable Banners
-  hosts: bigip
+  hosts: bigips_test
   gather_facts: False
   vars:
     provider:
