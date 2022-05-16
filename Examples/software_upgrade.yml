@@ -13,6 +13,7 @@
   tasks:
 
     # Pre-checks
+    # Obtain vs, pool and node count, and their status.
 
     - name: Get failover state
       command: cat /var/prompt/ps1
@@ -26,7 +27,8 @@
         delegate_to: localhost
       
       # Comment out this task if no connectivity to callhome or activate.f5.com.
-      # Create test to verify connectivity and skip of unsuccessful.
+      # Create variable to determine whether or not to reactivate license.
+      # Use list of shell commands to actually reactivate the license.
       - name: Reactivate License
         shell: SOAPLicenseClient --basekey $(perl -ane 'print $F[3] if /^Registration Key/' /config/bigip.license)
       
@@ -43,24 +45,28 @@
         command: tmsh run cm config-sync to-group "{{ item }}"
         loop: "{{ device_group.stdout_lines }}"
         loop_control:
-          pause: 5
+          pause: 10
+        
+      - name: Wait for final sync
+        wait_for:
+          timeout: 10
+        delegate_to: localhost
       
-      # Maybe include a wait_for for the final sync.
-
       - name: Get current time on BIG-IP
         command: date "+%F"
         register: date
       
       - name: Download a new UCS
         bigip_ucs_fetch:
+          async_timeout: 600
           src: "{{ inventory_hostname + '-' + date.stdout +  '-backup.ucs' }}"
-          dest: "{{ '/var/tmp/' + inventory_hostname + '-' + date.stdout +  '-backup.ucs' }}"
+          dest: "{{ '/backups/' + inventory_hostname + '-' + date.stdout +  '-backup.ucs' }}"
           provider: "{{ provider }}"
         delegate_to: localhost
       
       - name: Upload upgrade image
         bigip_software_image:
-          image: "{{ '/var/tmp/' + upgrade_iso }}"
+          image: "{{ '/images/' + upgrade_iso }}"
           provider: "{{ provider }}"
         delegate_to: localhost
       
@@ -70,35 +76,27 @@
         delegate_to: localhost
       
       - name: Get available volume number to use
-        script: /home/ben/as3-applications/Ansible/get_vol_number.bash
+        script: /scripts/get_vol_number.bash
         register: vol
       
       - name: Install BIG-IP software
         bigip_software_install:
           image: "{{ upgrade_iso }}"
-          state: activated # 'installed' if you don't want to reboot.
+          state: activated
           volume: "{{ vol.stdout }}"
           provider: "{{ provider }}"
         delegate_to: localhost
-
-      - name: Waiting for device to come back up...
-        wait_for:
-          delay: 300
-          port: 22
-          sleep: 30
-          timeout: 1800
-          msg: "Failed to poll device within specified time limit."
       
-      - name: Verify device is in standby
+      - name: Wait for device to return to standby
         bigip_command:
           provider: "{{ provider }}"
-          warn: no # maybe.. default is yes.
+          warn: no
           commands:
             - bash -c "cat /var/prompt/ps1"
           wait_for:
             - result[0] contains Standby
-          retries: 12
-          interval: 10
+          retries: 20
+          interval: 30
         register: result
         delegate_to: localhost
 
@@ -135,14 +133,15 @@
       
       - name: Download a new UCS
         bigip_ucs_fetch:
+          async_timeout: 600
           src: "{{ inventory_hostname + '-' + date.stdout +  '-backup.ucs' }}"
-          dest: "{{ '/var/tmp/' + inventory_hostname + '-' + date.stdout +  '-backup.ucs' }}"
+          dest: "{{ '/backups/' + inventory_hostname + '-' + date.stdout +  '-backup.ucs' }}"
           provider: "{{ provider }}"
         delegate_to: localhost
       
       - name: Upload upgrade image
         bigip_software_image:
-          image: "{{ '/var/tmp/' + upgrade_iso }}"
+          image: "{{ '/images/' + upgrade_iso }}"
           provider: "{{ provider }}"
         delegate_to: localhost
       
@@ -152,7 +151,7 @@
         delegate_to: localhost
       
       - name: Get available volume number to use
-        script: /path/get_vol_number.bash
+        script: /scripts/get_vol_number.bash
         register: vol
       
       - name: Install BIG-IP software
@@ -162,25 +161,17 @@
           volume: "{{ vol.stdout }}"
           provider: "{{ provider }}"
         delegate_to: localhost
- 
-      - name: Waiting for device to come back up...
-        wait_for:
-          delay: 300
-          port: 22
-          sleep: 30
-          timeout: 1800
-          msg: "Failed to poll device within specified time limit." 
       
-      - name: Verify device is in standby
+      - name: Wait for device to return to standby
         bigip_command:
           provider: "{{ provider }}"
-          warn: no # maybe.. default is yes.
+          warn: no
           commands:
             - bash -c "cat /var/prompt/ps1"
           wait_for:
             - result[0] contains Standby
-          retries: 12
-          interval: 10
+          retries: 20
+          interval: 30
         register: result
         delegate_to: localhost
       
@@ -192,7 +183,14 @@
         command: tmsh run cm config-sync to-group "{{ item }}"
         loop: "{{ device_group.stdout_lines }}"
         loop_control:
-          pause: 5
+          pause: 10
+      
+      - name: Wait for final sync
+        wait_for:
+          timeout: 20
+        delegate_to: localhost
+      
+      # Post checks
       
       when: failover_state.stdout  == 'Standby'
 
@@ -202,5 +200,4 @@
       when: failover_state.stdout  == 'Active'
     
     # Take backups
-    # Post checks
 ...
