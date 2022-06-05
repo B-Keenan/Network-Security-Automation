@@ -1,0 +1,63 @@
+---
+- name: Post-Upgrade Checks
+  block:
+    - name: Post-Upgrade Parse
+      set_fact:
+        endvirtstats: "{{ f5_info.results | map(attribute='virtual_servers') | flatten
+          | items2dict(key_name='full_path', value_name='availability_status') }}"
+        endpoolstats: "{{ f5_info.results | map(attribute='ltm_pools') | flatten
+          | items2dict(key_name='full_path', value_name='availability_status') }}"
+        endselfstats: "{{ f5_info.results | map(attribute='self_ips') | flatten
+          | items2dict(key_name='full_path', value_name='vlan') }}"
+        endvlanstats: "{{ f5_info.results | map(attribute='vlans') | flatten
+          | items2dict(key_name='full_path', value_name='tag') }}"
+
+    - name: Check Virtual Servers
+      assert:
+        that:
+          - item.value == endvirtstats[item.key]
+        fail_msg: "Virtual server '{{ item.key }}' state changed from '{{ item.value }}' to '{{ endvirtstats[item.key] }}'"
+        success_msg: "{{ item.key }} state unchanged"
+        quiet: yes
+      loop: "{{ startvirtstats|dict2items }}"
+      loop_control:
+        label: "{{ item.key }}"
+
+    - name: Check Pools
+      assert:
+        that:
+          - item.value == endpoolstats[item.key]
+        fail_msg: "Pool '{{ item.key }}' state changed from '{{ item.value }}' to '{{ endpoolstats[item.key] }}'"
+        success_msg: "{{ item.key }} state unchanged"
+        quiet: yes
+      loop: "{{ startpoolstats|dict2items }}"
+      loop_control:
+        label: "{{ item.key }}"
+
+    - name: Check Self-IPs
+      assert:
+        that:
+          - item.value == endselfstats[item.key]
+        fail_msg: "Self IP '{{ item.key }}' state changed from '{{ item.value }}' to '{{ endselfstats[item.key] }}'"
+        success_msg: "{{ item.key }} state unchanged"
+        quiet: yes
+      loop: "{{ startselfstats|dict2items }}"
+      loop_control:
+        label: "{{ item.key }}"
+
+    - name: Check VLANs
+      assert:
+        that:
+          - item.value == endvlanstats[item.key]
+        fail_msg: "VLAN '{{ item.key }}' state changed from '{{ item.value }}' to '{{ endselfstats[item.key] }}'"
+        success_msg: "{{ item.key }} state unchanged"
+        quiet: yes
+      loop: "{{ startvlanstats|dict2items }}"
+      loop_control:
+        label: "{{ item.key }}"
+
+  rescue:
+    - name: Post checks failed, rolling back and exiting play
+      command: tmsh reboot volume "{{ cur_vol.stdout }}"
+    
+    - meta: end_play
