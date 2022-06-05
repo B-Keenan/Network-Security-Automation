@@ -1,19 +1,16 @@
 ---
-- name: TMOS upgrade for an LTM active standby HA pair
-  hosts: bigips_test
+- name: F5 BIG-IP Upgrade LTM HA Active Standby Pair
+  hosts: bigip_lab
   gather_facts: False
   vars:
 
     provider:
       password: "{{ ansible_ssh_pass }}"
       server: "{{ ansible_host }}"
-      user: "sd-0482"
+      user: "{{ ansible_user }}"
       validate_certs: False
 
   tasks:
-
-    # Pre-checks
-    # Obtain vs, pool and node count, and their status.
 
     - name: Get failover state
       command: cat /var/prompt/ps1
@@ -26,9 +23,35 @@
           provider: "{{ provider }}"
         delegate_to: localhost
       
+      - name: Register Partitions
+        shell: tmsh list auth partition | grep partition | awk '{print $3}'
+        register: partitions
+
+      - name: Get Config Facts
+        bigip_device_info:
+          partition: "{{ item }}"
+          gather_subset:
+            - virtual-servers
+            - ltm-pools
+            - self-ips
+            - vlans
+          provider: "{{ provider }}"
+        loop: "{{ partitions.stdout_lines }}"
+        register: f5_info
+        delegate_to: localhost
+
+      - name: Pre-Upgrade Parse
+        set_fact:
+          startvirtstats: "{{ f5_info.results | map(attribute='virtual_servers') | flatten
+            | items2dict(key_name='full_path', value_name='availability_status') }}"
+          startpoolstats: "{{ f5_info.results | map(attribute='ltm_pools') | flatten
+            | items2dict(key_name='full_path', value_name='availability_status') }}"
+          startselfstats: "{{ f5_info.results | map(attribute='self_ips') | flatten
+            | items2dict(key_name='full_path', value_name='vlan') }}"
+          startvlanstats: "{{ f5_info.results | map(attribute='vlans') | flatten
+            | items2dict(key_name='full_path', key_name='tag') }}"
+      
       # Comment out this task if no connectivity to callhome or activate.f5.com.
-      # Create variable to determine whether or not to reactivate license.
-      # Use list of shell commands to actually reactivate the license.
       - name: Reactivate License
         shell: SOAPLicenseClient --basekey $(perl -ane 'print $F[3] if /^Registration Key/' /config/bigip.license)
       
@@ -49,7 +72,7 @@
         
       - name: Wait for final sync
         wait_for:
-          timeout: 10
+          timeout: 20
         delegate_to: localhost
       
       - name: Get current time on BIG-IP
@@ -100,12 +123,71 @@
         register: result
         delegate_to: localhost
 
-      when: failover_state.stdout  == 'Standby'
+      - name: Post-Upgrade Parse
+        set_fact:
+          endvirtstats: "{{ f5_info.results | map(attribute='virtual_servers') | flatten
+            | items2dict(key_name='full_path', value_name='availability_status') }}"
+          endpoolstats: "{{ f5_info.results | map(attribute='ltm_pools') | flatten
+            | items2dict(key_name='full_path', value_name='availability_status') }}"
+          endselfstats: "{{ f5_info.results | map(attribute='self_ips') | flatten
+            | items2dict(key_name='full_path', value_name='vlan') }}"
+          endvlanstats: "{{ f5_info.results | map(attribute='vlans') | flatten
+            | items2dict(key_name='full_path', value_name='tag') }}"
+      
+      - name: Check Virtual Servers
+        assert:
+          that:
+            - item.value == endvirtstats[item.key]
+          fail_msg: "Virtual server '{{ item.key }}' state changed from '{{ item.value }}' to '{{ endvirtstats[item.key] }}'"
+          success_msg: "{{ item.key }} state unchanged"
+          quiet: yes
+        loop: "{{ startvirtstats|dict2items }}"
+        loop_control:
+          label: "{{ item.key }}"
+        any_errors_fatal: true
+
+      - name: Check Pools
+        assert:
+          that:
+            - item.value == endpoolstats[item.key]
+          fail_msg: "Pool '{{ item.key }}' state changed from '{{ item.value }}' to '{{ endpoolstats[item.key] }}'"
+          success_msg: "{{ item.key }} state unchanged"
+          quiet: yes
+        loop: "{{ startpoolstats|dict2items }}"
+        loop_control:
+          label: "{{ item.key }}"
+        any_errors_fatal: true
+
+      - name: Check Self-IPs
+        assert:
+          that:
+            - item.value == endselfstats[item.key]
+          fail_msg: "Self IP '{{ item.key }}' state changed from '{{ item.value }}' to '{{ endselfstats[item.key] }}'"
+          success_msg: "{{ item.key }} state unchanged"
+          quiet: yes
+        loop: "{{ startselfstats|dict2items }}"
+        loop_control:
+          label: "{{ item.key }}"
+        any_errors_fatal: true
+
+      - name: Check VLANs
+        assert:
+          that:
+            - item.value == endvlanstats[item.key]
+          fail_msg: "VLAN '{{ item.key }}' state changed from '{{ item.value }}' to '{{ endselfstats[item.key] }}'"
+          success_msg: "{{ item.key }} state unchanged"
+          quiet: yes
+        loop: "{{ startvlanstats|dict2items }}"
+        loop_control:
+          label: "{{ item.key }}"
+        any_errors_fatal: true
+
+      when: "'Standby' in failover_state.stdout"
 
 
     - name: Failover so we're running on the new software
       command: tmsh run sys failover standby
-      when: failover_state.stdout  == 'Active'
+      when: "'Active' in failover_state.stdout"
     
     - name: Update failover state variable to upgrade next standby
       command: cat /var/prompt/ps1
@@ -117,6 +199,30 @@
           save: yes
           provider: "{{ provider }}"
         delegate_to: localhost
+
+      - name: Get Config Facts
+        bigip_device_info:
+          partition: "{{ item }}"
+          gather_subset:
+            - virtual-servers
+            - ltm-pools
+            - self-ips
+            - vlans
+          provider: "{{ provider }}"
+        loop: "{{ partitions.stdout_lines }}"
+        register: f5_info
+        delegate_to: localhost
+
+      - name: Pre-Upgrade Parse
+        set_fact:
+          startvirtstats: "{{ f5_info.results | map(attribute='virtual_servers') | flatten
+            | items2dict(key_name='full_path', value_name='availability_status') }}"
+          startpoolstats: "{{ f5_info.results | map(attribute='ltm_pools') | flatten
+            | items2dict(key_name='full_path', value_name='availability_status') }}"
+          startselfstats: "{{ f5_info.results | map(attribute='self_ips') | flatten
+            | items2dict(key_name='full_path', value_name='vlan') }}"
+          startvlanstats: "{{ f5_info.results | map(attribute='vlans') | flatten
+            | items2dict(key_name='full_path', key_name='tag') }}"
       
       # Comment out this task if no connectivity to callhome or activate.f5.com.
       - name: Reactivate License
@@ -175,6 +281,65 @@
         register: result
         delegate_to: localhost
       
+      - name: Post-Upgrade Parse
+        set_fact:
+          endvirtstats: "{{ f5_info.results | map(attribute='virtual_servers') | flatten
+            | items2dict(key_name='full_path', value_name='availability_status') }}"
+          endpoolstats: "{{ f5_info.results | map(attribute='ltm_pools') | flatten
+            | items2dict(key_name='full_path', value_name='availability_status') }}"
+          endselfstats: "{{ f5_info.results | map(attribute='self_ips') | flatten
+            | items2dict(key_name='full_path', value_name='vlan') }}"
+          endvlanstats: "{{ f5_info.results | map(attribute='vlans') | flatten
+            | items2dict(key_name='full_path', value_name='tag') }}"
+      
+      - name: Check Virtual Servers
+        assert:
+          that:
+            - item.value == endvirtstats[item.key]
+          fail_msg: "Virtual server '{{ item.key }}' state changed from '{{ item.value }}' to '{{ endvirtstats[item.key] }}'"
+          success_msg: "{{ item.key }} state unchanged"
+          quiet: yes
+        loop: "{{ startvirtstats|dict2items }}"
+        loop_control:
+          label: "{{ item.key }}"
+        any_errors_fatal: true
+
+      - name: Check Pools
+        assert:
+          that:
+            - item.value == endpoolstats[item.key]
+          fail_msg: "Pool '{{ item.key }}' state changed from '{{ item.value }}' to '{{ endpoolstats[item.key] }}'"
+          success_msg: "{{ item.key }} state unchanged"
+          quiet: yes
+        loop: "{{ startpoolstats|dict2items }}"
+        loop_control:
+          label: "{{ item.key }}"
+        any_errors_fatal: true
+
+      - name: Check Self-IPs
+        assert:
+          that:
+            - item.value == endselfstats[item.key]
+          fail_msg: "Self IP '{{ item.key }}' state changed from '{{ item.value }}' to '{{ endselfstats[item.key] }}'"
+          success_msg: "{{ item.key }} state unchanged"
+          quiet: yes
+        loop: "{{ startselfstats|dict2items }}"
+        loop_control:
+          label: "{{ item.key }}"
+        any_errors_fatal: true
+
+      - name: Check VLANs
+        assert:
+          that:
+            - item.value == endvlanstats[item.key]
+          fail_msg: "VLAN '{{ item.key }}' state changed from '{{ item.value }}' to '{{ endselfstats[item.key] }}'"
+          success_msg: "{{ item.key }} state unchanged"
+          quiet: yes
+        loop: "{{ startvlanstats|dict2items }}"
+        loop_control:
+          label: "{{ item.key }}"
+        any_errors_fatal: true
+
       - name: Register device-groups with pending changes
         shell: tmsh show cm sync-status | grep 'to group' | awk '{print $8}'
         register: device_group
@@ -189,15 +354,19 @@
         wait_for:
           timeout: 20
         delegate_to: localhost
-      
-      # Post checks
-      
-      when: failover_state.stdout  == 'Standby'
+            
+      when: "'Standby' in failover_state.stdout"
 
 
     - name: Failover to resume original HA state
       command: tmsh run sys failover standby
-      when: failover_state.stdout  == 'Active'
+      when: "'Active' in failover_state.stdout"
     
-    # Take backups
+    - name: Backup new version configuration
+      bigip_ucs_fetch:
+        async_timeout: 600
+        src: "{{ inventory_hostname + '-' + date.stdout +  'post-upgrade-backup.ucs' }}"
+        dest: "{{ '/backups/' + inventory_hostname + '-' + date.stdout +  'post-upgrade-backup.ucs' }}"
+        provider: "{{ provider }}"
+      delegate_to: localhost
 ...
