@@ -1,7 +1,7 @@
 ###################################
 # maintenancePage
 ###################################
-# Description: Display a maintenance page when all pool members are offline using ifile.
+# Description: Display a maintenance page when all pool members are offline using ifile's.
 # Rule Author: Ben Keenan
 # Rule Version: 1.0
 # Last Modified: 31/05/2022

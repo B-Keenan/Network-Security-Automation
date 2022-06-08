@@ -1,3 +1,5 @@
+# Playbook to force offline pool members for server maintenance.
+
 ---
 - name: Enable Maintenance Page
   hosts: bigip_lab
