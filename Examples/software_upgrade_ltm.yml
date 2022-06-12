@@ -23,6 +23,10 @@
     - name: Register Partitions
       shell: tmsh list auth partition | grep partition | awk '{print $3}'
       register: partitions
+
+    - name: Register date on BIG-IP
+      command: date "+%F"
+      register: date
     
     - block:
       - name: Save running configuration
@@ -82,10 +86,6 @@
         wait_for:
           timeout: 20
         delegate_to: localhost
-      
-      - name: Get current time on BIG-IP
-        command: date "+%F"
-        register: date
       
       - name: Download a new UCS
         bigip_ucs_fetch:
@@ -259,10 +259,6 @@
           timeout: 120
         delegate_to: localhost
       
-      - name: Get current time on BIG-IP
-        command: date "+%F"
-        register: date
-      
       - name: Download a new UCS
         bigip_ucs_fetch:
           async_timeout: 1800
@@ -405,8 +401,8 @@
     - name: Backup new version configuration
       bigip_ucs_fetch:
         async_timeout: 1800
-        src: "{{ inventory_hostname + '-' + date.stdout +  'post-upgrade-backup.ucs' }}"
-        dest: "{{ '/backups/' + inventory_hostname + '-' + date.stdout +  'post-upgrade-backup.ucs' }}"
+        src: "{{ inventory_hostname + '-' + date.stdout +  '-post-upgrade-backup.ucs' }}"
+        dest: "{{ '/backups/' + inventory_hostname + '-' + date.stdout +  '-post-upgrade-backup.ucs' }}"
         provider: "{{ provider }}"
       delegate_to: localhost
 ...
