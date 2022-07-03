@@ -1,5 +1,6 @@
 # This playbook is designed to upgrade bigip LTM+Other provisioned devices that are in HA Active Standby pair.
 # Not designed for DNS or vCMP deployments.
+# Tested versions: 15.1.5.1
 
 ---
 - name: F5 BIG-IP Upgrade LTM HA Active Standby Pair

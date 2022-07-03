@@ -1,0 +1,103 @@
+{
+	"class": "AS3",
+	"action": "deploy",
+	"declaration": {
+		"class": "ADC",
+		"schemaVersion": "3.25.0",
+		"id": "F5-Overview",
+		"label": "VS-Deployment",
+		"remark": "Deploy three virtual servers",
+		"target": {
+			"hostname": "student2.example.com"
+		},
+        "updateMode": "selective",
+        "Common": {
+            "class": "Tenant",
+            "Shared": {
+                "class": "Application",
+                "template": "shared",
+				"ftp_vs": {
+					"class": "Service_L4",
+					"remark": "FTP L4 Forwarding vs",
+					"virtualAddresses": [
+						"10.255.34.94"
+					],
+					"virtualPort": 21,
+					"pool": "ftp_pool"
+				},
+				"ftp_pool": {
+					"class": "Pool",
+					"monitors": [
+						"icmp"
+					],
+					"members": [
+						{
+							"servicePort": 21,
+							"serverAddresses": [
+								"10.255.33.182"
+							],
+							"shareNodes": true
+						}
+					]
+				},
+                "broken_vs": {
+                    "class": "Service_HTTP",
+                    "remark": "Standard Web Server",
+                    "virtualAddresses": [
+                        "10.255.34.95"
+                    ],
+                    "virtualPort": 80,
+                    "snat": "none",
+                    "pool": "broken_pool"
+                },
+                "custom_http": {
+					"class": "Monitor",
+					"monitorType": "http",
+                    "send": "GET /login.php",
+					"receive": "200 OK"
+                },
+                "broken_pool": {
+                    "class": "Pool",
+					"monitors": [{
+						"use": "custom_http"
+					}],
+                    "members": [
+                        {
+							"servicePort": 80,
+							"serverAddresses": [
+								"10.255.33.182"
+							],
+							"shareNodes": true
+						}
+                    ]
+                },
+                "www_vs": {
+                    "class": "Service_HTTP",
+                    "remark": "Standard Web Server",
+                    "virtualAddresses": [
+                        "10.255.34.94"
+                    ],
+                    "virtualPort": 80,
+                    "pool": "www_pool"
+                },
+				"www_pool": {
+					"class": "Pool",
+					"monitors": [
+						"http"
+					],
+					"members": [
+						{
+							"servicePort": 80,
+							"serverAddresses": [
+								"10.255.33.182",
+                                "10.255.33.183",
+                                "10.255.33.184"
+							],
+							"shareNodes": true
+						}
+					]
+				}
+            }
+		}
+	}
+}
