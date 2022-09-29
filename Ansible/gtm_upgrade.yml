@@ -30,7 +30,6 @@
       register: gtm_group
 
     # Check if vs discovery is enabled on gtm in question, then disable or set enabled (no delete).
-    # Task not required for lb-cm devices.
     
     - block:
       # Disable gtm sync and rename sync group.
