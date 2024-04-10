@@ -1,0 +1,39 @@
+# FG firmware upgrade playbook
+#
+# Tested versions:
+# 
+#
+# Sample cli usage:
+# ansible-playbook fortigateUpgrade.yml -i hosts
+#
+# Sample crontab usage:
+# Run at 12pm on 15/11: 
+#SHELL=/bin/bash
+#0 12 15 11 * cd /home/socadmin/F5-env/ansible2.12.3 && source bin/activate && bin/ansible-playbook playbooks/fortigateUpgrade.yml > /opt/ansible/logs/fortigateUpgrade.log 2>&1
+
+---
+- name: Firmware Upgrade
+  hosts: FGT-01
+  gather_facts: false
+  collections:
+  - fortinet.fortios
+
+  connection: httpapi
+
+  vars:
+    ansible_httpapi_use_ssl: yes
+    ansible_httpapi_validate_certs: no
+    ansible_httpapi_port: 443
+
+  tasks:
+    - name: Perform firmware upgrade with local firmware file
+      fortios_monitor:
+        vdom: "{{ vdom }}"
+        access_token: "{{ fortios_access_token }}"
+        selector: 'upgrade.system.firmware'
+        params:
+          source: "upload"
+          filename: "FGT_100F-v7.2.4.F-build1396-FORTINET.out"
+          ignore_invalid_signature: true
+          file_content: "{{ lookup( 'file', './FGT_100F-v7.2.4.F-build1396-FORTINET.out') | string | b64encode }}"
+...

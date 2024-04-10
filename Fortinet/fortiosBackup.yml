@@ -1,0 +1,36 @@
+# FG firmware backup playbook
+#
+# Tested versions:
+# 
+#
+# Sample cli usage:
+# ansible-playbook fortigateBackup.yml -i hosts
+#
+# Sample crontab usage:
+# Run at 12pm on 15/11: 
+#SHELL=/bin/bash
+#0 12 15 11 * cd /home/socadmin/F5-env/ansible2.12.3 && source bin/activate && bin/ansible-playbook playbooks/fortigateBackup.yml > /opt/ansible/logs/fortigateBackup.log 2>&1
+
+---
+- name: FG Backup
+  hosts: FGT-01
+  gather_facts: false
+  connection: httpapi
+  collections:
+  - fortinet.fortios
+
+  vars:
+    ansible_httpapi_use_ssl: yes
+    ansible_httpapi_validate_certs: no
+    ansible_httpapi_port: 443
+
+  tasks:
+    - name: Take backup
+      fortios_monitor:
+        vdom: "{{ vdom }}"
+        access_token: "{{ fortios_access_token }}"
+        selector: 'backup.system.config'
+        params:
+          destination: '/FGT/backups/'
+          scope: "{{ vdom }}"
+...
