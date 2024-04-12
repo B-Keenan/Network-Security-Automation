@@ -1,6 +1,5 @@
 ---
 - name: Ping Test
-  hosts: lb
   gather_facts: False
 
   tasks:
