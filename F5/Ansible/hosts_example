@@ -1,2 +1,2 @@
-[example_host]
-f5.example.com ansible_host=1.1.1.1 ansible_user=admin ansible_ssh_pass='passwd'
+[F5-Lab]
+bigip01.example.com ansible_host=10.255.32.195 ansible_user=admin ansible_ssh_pass=[3kVN-scZpM4oXQSLh2D
