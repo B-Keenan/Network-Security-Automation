@@ -14,7 +14,7 @@
 
 ---
 - name: F5 BIG-IP Upgrade DNS Standalone
-  hosts: hosts
+  hosts: F5-Lab
   gather_facts: False
   any_errors_fatal: true
   serial: 1

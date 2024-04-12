@@ -1,0 +1,27 @@
+---
+- name: F5 BIG-IP TMOS Upgrade
+  hosts: F5-Lab
+  gather_facts: False
+  vars:
+
+    provider:
+      password: "{{ ansible_ssh_pass }}"
+      server: "{{ ansible_host }}"
+      user: "{{ ansible_user }}"
+      validate_certs: False
+
+  tasks:
+
+    - name: Register Partitions
+      shell: tmsh list auth partition | grep "auth partition" | awk '{print $3}'
+      register: partitions
+
+    - name: Gather VS's
+      bigip_device_info:
+        partition: "{{ item }}"
+        gather_subset:
+          - virtual-servers
+        provider: "{{ provider }}"
+      loop: "{{ partitions.stdout_lines }}"
+      register: f5_info
+      delegate_to: localhost

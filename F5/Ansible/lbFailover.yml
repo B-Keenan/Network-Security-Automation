@@ -10,7 +10,7 @@
 
 ---
 - name: F5 BIG-IP Perform Failover
-  hosts: lb
+  hosts: F5-Lab
   gather_facts: False
   vars:
 
