@@ -15,7 +15,7 @@
 
 ---
 - name: F5 BIG-IP TMOS Upgrade
-  hosts: F5-Lab
+  hosts: F5_Lab
   gather_facts: False
   vars:
 

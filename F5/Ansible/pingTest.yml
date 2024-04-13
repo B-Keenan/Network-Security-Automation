@@ -1,6 +1,6 @@
 ---
 - name: Ping Test
-  hosts: F5-Lab
+  hosts: F5_Lab
   gather_facts: False
 
   tasks:
