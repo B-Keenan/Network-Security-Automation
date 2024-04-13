@@ -1,7 +1,10 @@
 ---
-- name: F5 BIG-IP TMOS Upgrade
+- name: F5 BIG-IP
   hosts: F5-Lab
   gather_facts: False
+  collections:
+    - f5networks.f5_modules
+    
   vars:
 
     provider:
