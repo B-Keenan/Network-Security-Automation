@@ -3,6 +3,9 @@
   hosts: F5_Lab
   gather_facts: False
 
+  collections:
+    - f5networks.f5_modules
+
   vars:
 
     provider:
