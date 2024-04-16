@@ -1,0 +1,68 @@
+# Description:
+# Automate backups (ucs) using Ansible.
+#
+# Sample cli usage:
+# ansible-playbook backup.yml -i hosts
+#
+# Sample crontab usage:
+# Run daily at 6am: 0 6 * * * /usr/local/bin/ansible-playbook /home/ben/F5-Automation/Ansible/backup.yml -i /home/ben/F5-Automation/Ansible/hosts > /home/ben/backup.log 2>&1
+
+---
+- name: Running scheduled backups
+  hosts: F5_Lab
+  gather_facts: False
+
+  collections:
+    - f5networks.f5_modules
+    
+  vars:
+
+    provider:
+      password: "{{ ansible_ssh_pass }}"
+      server: "{{ ansible_host }}"
+      user: "{{ ansible_user }}"
+      validate_certs: False
+
+  tasks:
+
+    - block:
+        - name: Register date on BIG-IP
+          command: date "+%F"
+          register: date
+
+        - name: Download a new UCS and store in directory /backups
+          bigip_ucs_fetch:
+            async_timeout: 1800
+            src: "{{ inventory_hostname + '-' + date.stdout +  '-backup.ucs' }}"
+            dest: "{{ '/backups/' + inventory_hostname + '-' + date.stdout +  '-backup.ucs' }}"
+            provider: "{{ provider }}"
+          delegate_to: localhost
+        
+        - name: Remove UCS on F5
+          bigip_ucs:
+            ucs: "{{ inventory_hostname + '-' + date.stdout +  '-backup.ucs' }}"
+            state: absent
+            provider: "{{ provider }}"
+          delegate_to: localhost
+
+        - name: Send a success email notification
+          mail:
+            host: smtp.example.com
+            port: 25
+            to: ben.keenan@example.com, another@example.com
+            from: ansible@example.com
+            subject: 'Backup Completed for "{{ inventory_hostname }}"'
+            body: 'The backup completed successfully for host "{{ inventory_hostname }}"'
+          delegate_to: localhost
+
+      rescue:
+        - name: Sending failed backup email notification
+          mail:
+            host: smtp.example.com
+            port: 25
+            to: ben.keenan@example.com, another@example.com
+            from: ansible@example.com
+            subject: 'Backup Failed for "{{ inventory_hostname }}"'
+            body: 'Failed to get backup host "{{ inventory_hostname }}"'
+          delegate_to: localhost
+...

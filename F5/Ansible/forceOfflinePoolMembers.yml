@@ -1,0 +1,39 @@
+# Playbook to force offline pool members for server maintenance.
+
+---
+- name: Force offline pool members
+  hosts: F5_Lab
+  gather_facts: False
+
+  collections:
+    - f5networks.f5_modules
+
+  vars:
+    provider:
+      password: "{{ ansible_ssh_pass }}"
+      server: "{{ ansible_host }}"
+      user: "{{ ansible_user }}"
+      validate_certs: False
+  
+  tasks:
+    - name: Force offline members
+      bigip_pool_member:
+        state: forced_offline
+        pool: web_pool
+        partition: Common
+        name: "{{ item.name }}"
+        address: "{{ item.addr }}"
+        port: "{{ item.port }}"
+        provider: "{{ provider }}"
+      delegate_to: localhost
+      loop:
+        - name: server1
+          addr: 10.255.33.182
+          port: 80
+        - name: server2
+          addr: 10.255.33.183
+          port: 80
+        - name: server3
+          addr: 10.255.33.184
+          port: 80
+...
