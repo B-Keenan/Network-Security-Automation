@@ -1,0 +1,43 @@
+{
+    "class": "AS3",
+    "action": "deploy",
+    "persist": true,
+    "declaration": {
+        "class": "ADC",
+        "schemaVersion": "3.50.2",
+        "id": "example-declaration-02",
+        "label": "Sample 2",
+        "remark": "Simple SSL offload application with round robin pool",
+        "AS3": {
+            "class": "Tenant",
+            "defaultRouteDomain": 0,
+            "Web_Services": {
+                "class": "Application",
+                "template": "shared",
+                "web_https_vs": {
+                    "class": "Service_HTTPS",
+                    "virtualAddresses": [
+                        "10.255.34.211"
+                    ],
+                    "clientTLS": "/Common/example.com",
+                    "serverTLS": "-",
+                    "pool": "web_pool",
+                    "redirect80": false
+                },
+                "web_pool": {
+                    "class": "Pool",
+                    "monitors": [
+                        "http"
+                    ],
+                    "members": [{
+                        "servicePort": 80,
+                        "serverAddresses": [
+                            "10.255.33.182",
+                            "10.255.33.183"
+                        ]
+                    }]
+                }
+            }
+        }
+    }
+}
