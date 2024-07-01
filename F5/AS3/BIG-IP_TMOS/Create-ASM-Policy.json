@@ -20,7 +20,7 @@
                     "serverTechnologies": [
                         "Nginx"
                     ],
-                    "url": "https://raw.githubusercontent.com/B-Keenan/Network-Security-Automation/main/F5/AS3/ASM_Policy/Web-ASM_pol.xml"
+                    "url": "https://raw.githubusercontent.com/B-Keenan/Network-Security-Automation/main/F5/AS3/ASM_Policy/ASM-Nginx_pol.xml"
                 }
             }
         }
