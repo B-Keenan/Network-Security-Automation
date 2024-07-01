@@ -4,7 +4,7 @@
     "persist": true,
     "declaration": {
         "class": "ADC",
-        "schemaVersion": "3.47.0",
+        "schemaVersion": "3.50.2",
         "label": "Sample 5",
         "remark": "WAF Policy for HTTPS VS",
         "AS3": {
@@ -20,7 +20,7 @@
                     "serverTechnologies": [
                         "Nginx"
                     ],
-                    "url": "https://raw.githubusercontent.com/B-Keenan/Network-Security-Automation/main/F5/AS3/ASM_Policy/web_asm_pol.xml"
+                    "url": "https://raw.githubusercontent.com/B-Keenan/Network-Security-Automation/main/F5/AS3/ASM_Policy/Web-ASM_pol.xml"
                 }
             }
         }
