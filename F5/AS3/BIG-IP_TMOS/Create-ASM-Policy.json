@@ -16,11 +16,8 @@
                     "class": "WAF_Policy",
                     "enforcementMode": "transparent",
                     "ignoreChanges": false,
-                    "remark": "WAF policy for Nginx services",
-                    "serverTechnologies": [
-                        "Nginx"
-                    ],
-                    "url": "https://raw.githubusercontent.com/B-Keenan/Network-Security-Automation/main/F5/AS3/ASM_Policy/ASM-Nginx_pol.xml"
+                    "remark": "Basic WAF Policy",
+                    "url": "https://raw.githubusercontent.com/B-Keenan/Network-Security-Automation/main/F5/AS3/BIG-IP_TMOS/ASM_Policies/ASM-Basic_pol.xml"
                 }
             }
         }
