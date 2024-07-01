@@ -6,7 +6,7 @@
         "class": "ADC",
         "schemaVersion": "3.50.2",
         "label": "Sample 5",
-        "remark": "WAF Policy for HTTPS VS",
+        "remark": "Basic WAF Policy",
         "AS3": {
             "class": "Tenant",
             "Web_Services": {
