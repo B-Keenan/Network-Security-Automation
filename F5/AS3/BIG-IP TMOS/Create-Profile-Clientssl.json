@@ -1,0 +1,36 @@
+{
+    "class": "AS3",
+    "action": "deploy",
+    "persist": true,
+    "declaration": {
+        "class": "ADC",
+        "schemaVersion": "3.50.2",
+        "id": "example-declaration-03",
+        "label": "Sample 3",
+        "remark": "Create clientssl profile with existing cert-key-chain in Common",
+        "AS3": {
+            "class": "Tenant",
+            "defaultRouteDomain": 0,
+            "Web_Services": {
+                "class": "Application",
+                "template": "shared",
+                "example.com_clientssl": {
+                    "class": "TLS_Server",
+                    "certificates": [
+                        {
+                            "certificate": "example_com_cert"
+                        }
+                    ],
+                    "cipherGroup": {"bigip":"/Common/f5-secure"},
+                    "tls1_3Enabled": true
+                },
+                "example_com_cert": {
+                    "class": "Certificate",
+                    "certificate": {"bigip":"/Common/example.com_Jan24"},
+                    "privateKey": {"bigip":"/Common/example.com_Jan24"},
+                    "chainCA": {"bigip":"/Common/LabCA"}
+                }
+            }
+        }
+    }
+}

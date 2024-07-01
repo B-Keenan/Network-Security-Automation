@@ -5,8 +5,8 @@
     "declaration": {
         "class": "ADC",
         "schemaVersion": "3.50.2",
-        "id": "example-declaration-02",
-        "label": "Sample 2",
+        "id": "example-declaration-04",
+        "label": "Sample 4",
         "remark": "Simple SSL offload application with round robin pool",
         "AS3": {
             "class": "Tenant",
@@ -19,13 +19,13 @@
                     "virtualAddresses": [
                         "10.255.34.211"
                     ],
-                    "clientTLS": "/Common/example.com",
-                    "serverTLS": "-",
-                    "pool": "web_pool",
-                    "redirect80": false
+                    "virtualPort": 443,
+                    "serverTLS": "example.com_clientssl",
+                    "pool": "web_pool"
                 },
                 "web_pool": {
                     "class": "Pool",
+                    "remark": "HTTP Pool",
                     "monitors": [
                         "http"
                     ],
@@ -36,6 +36,23 @@
                             "10.255.33.183"
                         ]
                     }]
+                },
+                "example.com_clientssl": {
+                    "class": "TLS_Server",
+                    "remark": "Wildcard cert",
+                    "certificates": [
+                        {
+                            "certificate": "example.com_cert"
+                        }
+                    ],
+                    "cipherGroup": {"bigip":"/Common/f5-secure"},
+                    "tls1_3Enabled": true
+                },
+                "example.com_cert": {
+                    "class": "Certificate",
+                    "certificate": {"bigip":"/Common/example.com_Jan24"},
+                    "privateKey": {"bigip":"/Common/example.com_Jan24"},
+                    "chainCA": {"bigip":"/Common/LabCA"}
                 }
             }
         }

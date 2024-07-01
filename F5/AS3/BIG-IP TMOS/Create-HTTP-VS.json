@@ -5,24 +5,27 @@
     "declaration": {
         "class": "ADC",
         "schemaVersion": "3.50.2",
-        "id": "example-declaration-01",
-        "label": "Sample 1",
-        "remark": "Simple HTTP application with round robin pool",
+        "id": "example-declaration-02",
+        "label": "Sample 2",
+        "remark": "Simple HTTP application with RR pool",
         "AS3": {
             "class": "Tenant",
             "defaultRouteDomain": 0,
             "Web_Services": {
                 "class": "Application",
                 "template": "shared",
-                "web_http_vs": {
+                "web_vs": {
                     "class": "Service_HTTP",
+                    "remark": "Simple HTTP application with RR pool",
                     "virtualAddresses": [
                         "10.255.34.211"
                     ],
-                    "pool": "web_pool"
+                    "pool": "web_pool",
+                    "persistenceMethods": []
                 },
                 "web_pool": {
                     "class": "Pool",
+                    "remark": "HTTP Pool",
                     "monitors": [
                         "http"
                     ],
