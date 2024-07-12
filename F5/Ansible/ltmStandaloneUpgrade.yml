@@ -16,7 +16,7 @@
 
 ---
 - name: F5 BIG-IP TMOS Upgrade
-  hosts: bigip01.example.com
+  hosts: bigipdns.example.com
   gather_facts: False
   any_errors_fatal: true
   vars:
