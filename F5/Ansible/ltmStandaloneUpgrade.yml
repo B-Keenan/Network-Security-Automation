@@ -19,6 +19,10 @@
   hosts: bigipdns.example.com
   gather_facts: False
   any_errors_fatal: true
+
+  collections:
+    - f5networks.f5_modules
+
   vars:
 
     provider:
@@ -94,12 +98,13 @@
             | items2dict(key_name='full_path', value_name='tag') }}"
       
       # Comment out this task if no connectivity to callhome or activate.f5.com.
-      #- name: Reactivate License
-        #shell: SOAPLicenseClient --basekey $(perl -ane 'print $F[3] if /^Registration Key/' /config/bigip.license)      
-      #- name: Wait for configuration to finish loading
-        #wait_for:
-          #timeout: 120
-        #delegate_to: localhost
+      - name: Reactivate License
+        shell: SOAPLicenseClient --basekey $(perl -ane 'print $F[3] if /^Registration Key/' /config/bigip.license)      
+      
+      - name: Wait for configuration to finish loading
+        wait_for:
+          timeout: 120
+        delegate_to: localhost
       
       - name: Download and store a new UCS
         bigip_ucs_fetch:
@@ -223,18 +228,18 @@
               label: "{{ item.key }}"
 
         rescue:
-          #- name: Post checks failed, rolling back and exiting play
-            #command: tmsh reboot volume "{{ cur_vol.stdout }}"
+          - name: Post checks failed, rolling back and exiting play
+            command: tmsh reboot volume "{{ cur_vol.stdout }}"
 
-          #- name: Send email notification
-            #mail:
-              #host: smtp.scmp.host
-              #port: 25
-              #to: ben.keenan@example.com
-              #from: ansible-cm1@example.com
-              #subject: 'Post checks failed for "{{ inventory_hostname }}"'
-              #body: 'Device "{{ inventory_hostname }}" has mismatch of object state for either Virtual Servers, Pools, Self IPs or VLAN tag IDs. Check logs for more details /opt/ansible/logs/ltmClusterUpgrade.log and verify the states are the same as the active.'
-            #delegate_to: localhost
+          - name: Send email notification
+            mail:
+              host: smtp.scmp.host
+              port: 25
+              to: ben.keenan@example.com
+              from: ansible-cm1@example.com
+              subject: 'Post checks failed for "{{ inventory_hostname }}"'
+              body: 'Device "{{ inventory_hostname }}" has mismatch of object state for either Virtual Servers, Pools, Self IPs or VLAN tag IDs. Check logs for more details /opt/ansible/logs/ltmClusterUpgrade.log and verify the states are the same as the active.'
+            delegate_to: localhost
           
           - meta: end_play
           
@@ -253,26 +258,26 @@
           provider: "{{ provider }}"
         delegate_to: localhost
 
-      #- name: Send a success email notification
-        #mail:
-          #host: smtp.scmp.host
-          #port: 25
-          #to: ben.keenan@example.com
-          #from: ansible-cm1@example.com
-          #subject: 'Upgrade completed for "{{ inventory_hostname }}"'
-          #body: 'Host "{{ inventory_hostname }}" was successfully upgraded'
-        #delegate_to: localhost
+      - name: Send a success email notification
+        mail:
+          host: smtp.scmp.host
+          port: 25
+          to: ben.keenan@example.com
+          from: ansible-cm1@example.com
+          subject: 'Upgrade completed for "{{ inventory_hostname }}"'
+          body: 'Host "{{ inventory_hostname }}" was successfully upgraded'
+        delegate_to: localhost
 
       rescue:
-        #- name: Upgrade failed
-          #mail:
-            #host: smtp.scmp.host
-            #port: 25
-            #to: ben.keenan@example.com
-            #from: ansible-cm1@example.com
-            #subject: 'Upgrade failed for "{{ inventory_hostname }}"'
-            #body: 'Upgrade failed for device "{{ inventory_hostname }}". No further action has been taken. Check log file for more #details /opt/ansible/logs/ltmClusterUpgrade.log'
-          #delegate_to: localhost
+        - name: Upgrade failed
+          mail:
+            host: smtp.scmp.host
+            port: 25
+            to: ben.keenan@example.com
+            from: ansible-cm1@example.com
+            subject: 'Upgrade failed for "{{ inventory_hostname }}"'
+            body: 'Upgrade failed for device "{{ inventory_hostname }}". No further action has been taken. Check log file for more #details /opt/ansible/logs/ltmClusterUpgrade.log'
+          delegate_to: localhost
         
         - meta: end_play
       

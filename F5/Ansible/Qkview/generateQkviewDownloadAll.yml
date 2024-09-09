@@ -1,0 +1,74 @@
+---
+- name: Generate & upload qkview & download all files for reporting
+  hosts: F5_Lab
+  gather_facts: False
+
+  collections:
+    - f5networks.f5_modules
+
+  vars:
+
+    provider:
+      password: "{{ ansible_ssh_pass }}"
+      server: "{{ ansible_host }}"
+      user: "{{ ansible_user }}"
+      validate_certs: False
+
+  tasks:
+
+    - name: Generate qkview
+      bigip_qkview:
+        exclude_core: true
+        dest: "{{ file_path + inventory_hostname + '.qkview' }}"
+        provider:
+          "{{ provider }}"
+      delegate_to: localhost
+
+    - name: Generate API access token
+      # Client ID and Secret are valid for 6 months.
+      # Auth token is valid for 30 mins.
+      shell: |
+        curl --request POST --url https://identity.account.f5.com/oauth2/ausp95ykc80HOU7SQ357/v1/token -H "accept: application/json" -H "authorization: Basic "{{ ihealth_basic }}"" -H "cache-control: no-cache" -H "content-type: application/x-www-form-urlencoded" --data "grant_type=client_credentials&scope=ihealth"
+      register: payload
+      delegate_to: localhost
+
+    - set_fact:
+        bearer_token: "{{ payload.stdout }}"
+
+    - name: Upload qkview to ihealth
+      shell: |
+        curl --request POST --url https://ihealth2-api.f5.com/qkview-analyzer/api/qkviews?visible_in_gui=true -H "Authorization: Bearer "{{ bearer_token.access_token }}"" -H "Accept: application/vnd.f5.ihealth.api" --user-agent "AnsibleClient" -o - -F qkview=@""{{ file_path + inventory_hostname + '.qkview' }}""
+      register: response_message
+      delegate_to: localhost
+
+    - set_fact:
+        qkview_id: "{{ response_message.stdout | regex_search('<id>([0-9]+)</id>', '\\1') }}"
+
+    - wait_for:
+        timeout: 300
+      delegate_to: localhost
+
+    - name: Download diagnostics pdf
+      shell: |
+        curl --url https://ihealth2-api.f5.com/qkview-analyzer/api/qkviews/"{{ qkview_id[0] }}"/diagnostics.pdf -H "Authorization: Bearer "{{ bearer_token.access_token }}"" -H "Accept: application/vnd.f5.ihealth.api" --user-agent "AnsibleClient" --output "{{ file_path + inventory_hostname + '-diagnostics.pdf' }}"
+      delegate_to: localhost
+
+    - name: Download memory graph
+      shell: |
+        curl --url https://ihealth2-api.f5.com/qkview-analyzer/api/qkviews/"{{ qkview_id[0] }}"/graphs/memory?timespan=30 -H "Authorization: Bearer "{{ bearer_token.access_token }}"" -H "Accept: application/vnd.f5.ihealth.api" --user-agent "AnsibleClient" --output "{{ file_path + inventory_hostname + '-memory.png' }}"
+      delegate_to: localhost
+    
+    - name: Download CPU graph
+      shell: |
+        curl --url https://ihealth2-api.f5.com/qkview-analyzer/api/qkviews/"{{ qkview_id[0] }}"/graphs/CPU?timespan=30 -H "Authorization: Bearer "{{ bearer_token.access_token }}"" -H "Accept: application/vnd.f5.ihealth.api" --user-agent "AnsibleClient" --output "{{ file_path + inventory_hostname + '-CPU.png' }}"
+      delegate_to: localhost
+
+    - name: Download blade 0 CPU graph
+      shell: |
+        curl --url https://ihealth2-api.f5.com/qkview-analyzer/api/qkviews/"{{ qkview_id[0] }}"/graphs/blade0cpucores?timespan=30 -H "Authorization: Bearer "{{ bearer_token.access_token }}"" -H "Accept: application/vnd.f5.ihealth.api" --user-agent "AnsibleClient" --output "{{ file_path + inventory_hostname + '-blade0cpucores.png' }}"
+      delegate_to: localhost
+
+    - name: Download throughput graph
+      shell: |
+        curl --url https://ihealth2-api.f5.com/qkview-analyzer/api/qkviews/"{{ qkview_id[0] }}"/graphs/throughput?timespan=30 -H "Authorization: Bearer "{{ bearer_token.access_token }}"" -H "Accept: application/vnd.f5.ihealth.api" --user-agent "AnsibleClient" --output "{{ file_path + inventory_hostname + '-throughput.png' }}"
+      delegate_to: localhost

@@ -1,0 +1,70 @@
+---
+- name: Attach image files to docx
+  hosts: F5_Lab
+  gather_facts: False
+
+  tasks:
+
+    - set_fact:
+        files:
+          - "{{ file_path + inventory_hostname + '-memory.png' }}"
+          - "{{ file_path + inventory_hostname + '-CPU.png' }}"
+          - "{{ file_path + inventory_hostname + '-blade0cpucores.png' }}"
+          - "{{ file_path + inventory_hostname + '-throughput.png' }}"
+
+    - name: Verify required packages are installed
+      apt:
+        name: "{{ item }}"
+        state: present
+      loop:
+        - python3
+        - python3-pip
+      delegate_to: localhost
+
+    - name: Install required Python packages
+      pip:
+        name: python-docx
+        executable: pip3
+      delegate_to: localhost
+
+    - name: Create a python script to insert images into a docx file
+      copy:
+        dest: '{{ file_path }}insert_images.py'
+        content: |
+          from docx import Document
+          from docx.shared import Inches
+
+          docx_path = '{{ docx_template }}'
+          search_string = 'The performance graphs will show memory used, CPU usage and throughput(bits).'
+          images = {{ png_files | to_json }}
+
+          def insert_images_into_docx(docx_path, search_string, images):
+            doc = Document(docx_path)
+
+            found = False
+
+            for paragraph in doc.paragraphs:
+              if search_string in paragraph.text:
+                # Find the index where the string occurs
+                start_idx = paragraph.text.find(search_string)
+                # Append device name and images after the found string
+                paragraph.text = paragraph.text[:start_idx + len(search_string)] + '\n\n' + "{{ inventory_hostname }}"
+
+                for image in images:
+                  paragraph.add_run().add_picture(image, width=Inches(6.0))
+
+                found = True
+            
+            if found:
+              # Save the modified document
+              doc.save('{{ file_path }}' + 'F5MonthlyReport-' + '{{ inventory_hostname }}' + '.docx')
+              print(f"The document has been modified and saved as F5MonthlyReport-{{ inventory_hostname }}.docx.")
+            else:
+              print(f"'{search_string}' not found in the document.")
+
+          insert_images_into_docx(docx_path, search_string, images)
+      delegate_to: localhost
+      
+    - name: Run python script
+      command: python3 /var/tmp/insert_images.py
+      delegate_to: localhost

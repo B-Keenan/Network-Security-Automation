@@ -1,0 +1,23 @@
+---
+- name: Upload qkview
+  hosts: F5_Lab
+  gather_facts: False
+
+  tasks:
+
+    - name: Generate API access token
+      # Client ID and Secret are valid for 6 months.
+      # Auth token is valid for 30 mins.
+      shell: |
+        curl --request POST --url https://identity.account.f5.com/oauth2/ausp95ykc80HOU7SQ357/v1/token -H "accept: application/json" -H "authorization: Basic "{{ ihealth_basic }}"" -H "cache-control: no-cache" -H "content-type: application/x-www-form-urlencoded" --data "grant_type=client_credentials&scope=ihealth"
+      register: payload
+      delegate_to: localhost
+
+    - set_fact:
+        bearer_token: "{{ payload.stdout }}"
+
+    - name: Upload qkview to ihealth
+      shell: |
+        curl --request POST --url https://ihealth2-api.f5.com/qkview-analyzer/api/qkviews?visible_in_gui=true -H "Authorization: Bearer "{{ bearer_token.access_token }}"" -H "Accept: application/vnd.f5.ihealth.api" --user-agent "AnsibleClient" -o - -F qkview=@""{{ '/var/tmp/' + inventory_hostname + '.qkview' }}""
+      delegate_to: localhost
+      

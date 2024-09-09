@@ -1,0 +1,74 @@
+---
+- name: Attach pdf to docx
+  hosts: F5_Lab
+  gather_facts: False
+
+  tasks:
+
+    - set_fact:
+        new_docx: "{{ file_path + 'F5MonthlyReport-' + inventory_hostname + '.docx' }}"
+
+    - set_fact:
+        diag_pdf: "{{ file_path + inventory_hostname + '-diagnostics.pdf' }}"
+
+    - name: Install required Python packages
+      pip:
+        name: pdf2image
+        executable: pip3
+      delegate_to: localhost
+    
+    - name: Create a python script to insert pdf into a docx file
+      copy:
+        dest: '{{ file_path }}insert_diag_pdf.py'
+        content: |
+          from pdf2image import convert_from_path
+          from docx import Document
+          from docx.shared import Inches
+          import os
+
+          report_docx = '{{ modified_docx }}'
+          diag_pdf = '{{ diag_pdf }}'
+          search_string = 'Then upload the qkview to ihealth https://ihealth.f5.com/'
+
+          def attach_pdf_to_docx(report_docx, diag_pdf, search_string):
+            # Load the DOCX file
+            doc = Document(report_docx)
+
+            images = convert_from_path(diag_pdf)
+            
+            found = False
+
+            for paragraph in doc.paragraphs:
+              if search_string in paragraph.text:
+                # Find the index where the string occurs
+                start_idx = paragraph.text.find(search_string)
+                # Append device name after the found string
+                paragraph.text = paragraph.text[:start_idx + len(search_string)] + '\n\n'
+
+                for i, image in enumerate(images):
+                  image_path = f"page_{i+1}.png"
+                  image.save(image_path, 'PNG')
+
+                  paragraph.add_run().add_picture(image_path, width=Inches(6))
+
+                  if i < len(images) - 1:
+                    doc.add_page_break()
+
+                  os.remove(image_path)
+
+                found = True
+                
+            if found:
+              # Save the modified document
+              doc.save('{{ file_path }}' + 'F5MonthlyReport-' + '{{ inventory_hostname }}' + '.docx')
+              print(f"The document has been modified and saved as F5MonthlyReport-{{ inventory_hostname }}.docx.")
+            else:
+              print(f"'{search_string}' not found in the document.")
+              
+          attach_pdf_to_docx(report_docx, diag_pdf, search_string)
+      
+      delegate_to: localhost
+    
+    - name: Run python script
+      command: "{{ 'python3 ' + file_path + 'insert_diag_pdf.py' }}"
+      delegate_to: localhost

@@ -1,0 +1,55 @@
+# Description:
+# Automate backups (ucs) using Ansible.
+#
+# Sample cli usage:
+# ansible-playbook scpBackup.yml -i hosts
+#
+# Sample crontab usage:
+# Run daily at 6am: 0 6 * * * /usr/local/bin/ansible-playbook /home/ben/F5-Automation/Ansible/scpBackup.yml -i /home/ben/F5-Automation/Ansible/hosts > /home/ben/scpBackup.log 2>&1
+
+---
+- name: Running scheduled backups
+  hosts: bigipdns.example.com
+  gather_facts: False
+
+  collections:
+    - f5networks.f5_modules
+    
+  vars:
+
+    provider:
+      password: "{{ ansible_ssh_pass }}"
+      server: "{{ ansible_host }}"
+      user: "{{ ansible_user }}"
+      validate_certs: False
+
+  tasks:
+
+    - name: Register date on BIG-IP
+      command: date "+%F"
+      register: date
+
+    - name: Create UCS
+      bigip_ucs_fetch:
+        async_timeout: 1800
+        src: "{{ inventory_hostname + '-' + date.stdout +  '-backup.ucs' }}"
+        only_create_file: true
+        provider: "{{ provider }}"
+      delegate_to: localhost
+    
+    - name: SCP the UCS file
+      # SSH pub key auth required or an Expect script to handle the password prompt.
+      command: scp /var/local/ucs/"{{ inventory_hostname + '-' + date.stdout +  '-backup.ucs' }}" ben@10.255.32.190:/opt/ansible/backups
+
+    - name: Wait...
+      wait_for:
+        timeout: 60
+      delegate_to: localhost
+
+    - name: Remove UCS on the F5
+      bigip_ucs:
+        ucs: "{{ inventory_hostname + '-' + date.stdout +  '-backup.ucs' }}"
+        state: absent
+        provider: "{{ provider }}"
+      delegate_to: localhost
+...

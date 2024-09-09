@@ -1,0 +1,48 @@
+---
+- name: Replace text in docx
+  hosts: F5_Lab
+  gather_facts: False
+
+  vars:
+
+    provider:
+      password: "{{ ansible_ssh_pass }}"
+      server: "{{ ansible_host }}"
+      user: "{{ ansible_user }}"
+      validate_certs: False
+
+  tasks:
+
+    - name: Register date on BIG-IP
+      command: date "+%F"
+      register: date
+      delegate_to: localhost
+    
+    - name: Create a python script to replace text in a docx file
+      copy:
+        dest: '{{ file_path }}replace_text_in_docx.py'
+        content: |
+          from docx import Document
+          import sys
+
+          report_docx = "{{ file_path + 'F5MonthlyReport-' + inventory_hostname + '.docx' }}"
+          search_name = "<customer>"
+          search_date = "<date>"
+          replace_name = "{{ customer_name }}"
+          replace_date = "{{ date.stdout }}"
+
+          def replace_text_in_docx(report_docx, search_name, search_date, replace_name, replace_date):
+            doc = Document(report_docx)
+            for paragraph in doc.paragraphs:
+                if search_name in paragraph.text:
+                    paragraph.text = paragraph.text.replace(search_name, replace_name)
+                if search_date in paragraph.text:
+                    paragraph.text = paragraph.text.replace(search_date, replace_date)
+            doc.save('{{ file_path }}' + 'F5MonthlyReport-' + '{{ inventory_hostname }}' + '.docx')
+          
+          replace_text_in_docx(report_docx, search_name, search_date, replace_name, replace_date)
+      delegate_to: localhost
+
+    - name: Run python script
+      command: "{{ 'python3 ' + file_path + 'replace_text_in_docx.py' }}"
+      delegate_to: localhost

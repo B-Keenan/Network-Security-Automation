@@ -1,0 +1,25 @@
+---
+- name: Generate qkview
+  hosts: F5_Lab
+  gather_facts: False
+
+  collections:
+    - f5networks.f5_modules
+
+  vars:
+
+    provider:
+      password: "{{ ansible_ssh_pass }}"
+      server: "{{ ansible_host }}"
+      user: "{{ ansible_user }}"
+      validate_certs: False
+
+  tasks:
+
+    - name: Generate qkview
+      bigip_qkview:
+        exclude_core: true
+        dest: "{{ '/var/tmp/' + inventory_hostname + '.qkview' }}"
+        provider:
+          "{{ provider }}"
+      delegate_to: localhost
